@@ -18,16 +18,16 @@ public sealed class CaptainOfIndustryPlugin : IGameModPlugin
     public PluginMetadata Metadata { get; } = new(
         Id: "kroste.captainofindustry",
         DisplayName: "Captain of Industry Mod-Manager",
-        Version: "0.3.0",
+        Version: "0.3.1",
         Author: "Kroste",
         Description: "Mod-Verwaltung fuer Captain of Industry (MaFi Games). " +
-            "v0.3.0: Workshop-Empty-State zeigt jetzt eine kuratierte Liste " +
-            "von GitHub-Mod-Repos aus dem Meta-Repo KroModIx/KroModIx.CoiModIndex " +
-            "(HTTP-Fetch mit 6h-Cache) — jede Installation sieht sofort neue " +
-            "Sources sobald dort ein PR gemerged wird. Contribute-Button oeffnet " +
-            "den Meta-Repo fuer PRs. v0.2.0: Drei Tabs — Workshop, Installiert " +
-            "(mod.json-Discovery), Downloads (Local .zip-Import). v0.1.0: nur " +
-            "Workshop-Consumer. DE+EN.");
+            "v0.3.1: Sources-Cards rendern jetzt ein gelbes ⚠-Warning-Chip " +
+            "wenn im Meta-Repo ein optionales warning-Feld gesetzt ist (z.B. " +
+            "Legal-Konflikt, Kompatibilitaets-Bruch, Adult-Content). " +
+            "v0.3.0: Workshop-Empty-State mit kuratierter GitHub-Sources-Liste " +
+            "aus KroModIx/KroModIx.CoiModIndex (6h-Cache). v0.2.0: Drei Tabs " +
+            "— Workshop, Installiert (mod.json-Discovery), Downloads (Local " +
+            ".zip-Import). v0.1.0: Workshop-Consumer. DE+EN.");
 
     public IReadOnlyList<GameTarget> Targets { get; } = new[]
     {

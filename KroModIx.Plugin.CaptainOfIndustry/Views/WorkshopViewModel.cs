@@ -235,6 +235,8 @@ public sealed class SourceRow
     public string TagsLabel => Source.Tags is { Count: > 0 }
         ? string.Join(" · ", Source.Tags) : "";
     public bool HasTags => Source.Tags is { Count: > 0 };
+    public string Warning => Source.Warning ?? "";
+    public bool HasWarning => !string.IsNullOrWhiteSpace(Source.Warning);
 }
 
 public sealed partial class WorkshopRow : ObservableObject

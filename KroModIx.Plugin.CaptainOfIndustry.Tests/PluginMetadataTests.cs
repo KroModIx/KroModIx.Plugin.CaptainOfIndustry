@@ -13,7 +13,7 @@ public class PluginMetadataTests
     {
         var plugin = new CaptainOfIndustryPlugin();
         plugin.Metadata.Id.Should().Be("kroste.captainofindustry");
-        plugin.Metadata.Version.Should().Be("0.3.0");
+        plugin.Metadata.Version.Should().Be("0.3.1");
     }
 
     [Fact]

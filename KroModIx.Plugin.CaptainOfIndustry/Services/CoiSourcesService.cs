@@ -103,6 +103,7 @@ public sealed record CoiSourceEntry(
     string Repo,
     string DisplayName,
     string Description,
+    string? Warning = null,
     IReadOnlyList<string>? Tags = null)
 {
     public string GitHubUrl => $"https://github.com/{Repo}";

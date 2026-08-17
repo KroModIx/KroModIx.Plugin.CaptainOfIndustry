@@ -286,10 +286,40 @@ public sealed class WorkshopView : UserControl
         tags.Bind(TextBlock.TextProperty, new Binding(nameof(SourceRow.TagsLabel)));
         tags.Bind(TextBlock.IsVisibleProperty, new Binding(nameof(SourceRow.HasTags)));
 
+        // Warning-Chip: gelbes ⚠ + Text, wrapped. Nur sichtbar wenn das
+        // Meta-Repo ein warning-Feld gesetzt hat (Legal/Adult/veraltet/EA).
+        var warningIcon = new TextBlock
+        {
+            Text = "⚠", FontSize = 12, FontWeight = FontWeight.SemiBold,
+            VerticalAlignment = VerticalAlignment.Top,
+            Foreground = Brushes.Black,
+            Margin = new Thickness(0, 0, 6, 0),
+        };
+        var warningText = new TextBlock
+        {
+            FontSize = 11, TextWrapping = TextWrapping.Wrap,
+            Foreground = Brushes.Black,
+        };
+        warningText.Bind(TextBlock.TextProperty, new Binding(nameof(SourceRow.Warning)));
+        var warningPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Children = { warningIcon, warningText },
+        };
+        var warningBorder = new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(0xFA, 0xD8, 0x64)), // Kroste-Gold-ish
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(8, 4),
+            Margin = new Thickness(0, 6, 0, 0),
+            Child = warningPanel,
+        };
+        warningBorder.Bind(Border.IsVisibleProperty, new Binding(nameof(SourceRow.HasWarning)));
+
         var textColumn = new StackPanel
         {
             Spacing = 2, VerticalAlignment = VerticalAlignment.Center,
-            Children = { name, repo, description, tags },
+            Children = { name, repo, description, warningBorder, tags },
         };
 
         var openBtn = new Button
