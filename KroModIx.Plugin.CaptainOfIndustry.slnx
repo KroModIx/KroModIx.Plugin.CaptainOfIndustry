@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="KroModIx.Plugin.CaptainOfIndustry/KroModIx.Plugin.CaptainOfIndustry.csproj" />
+  <Project Path="KroModIx.Plugin.CaptainOfIndustry.Tests/KroModIx.Plugin.CaptainOfIndustry.Tests.csproj" />
+</Solution>

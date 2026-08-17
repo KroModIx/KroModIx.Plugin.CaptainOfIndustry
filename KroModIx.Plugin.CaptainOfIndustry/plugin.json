@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "kroste.captainofindustry",
+  "displayName": "Captain of Industry Mod-Manager",
+  "version": "0.1.0",
+  "author": "Kroste",
+  "description": "Mod-Verwaltung für Captain of Industry (MaFi Games, AppId 1594320). Workshop-Consumer via _host.Workshop (Contracts v1.17): listet die vom User abonnierten Steam-Workshop-Items. Un/Subscribe bleibt beim Steam-Client — hier nur Discovery mit Cover, Titel, Autor, Subscriber-Count + Deep-Links (Steam-Client, Browser, Ordner). DE+EN. MinHostVersion 1.18.0 (fuer IImageDecoder).",
+  "assembly": "KroModIx.Plugin.CaptainOfIndustry.dll",
+  "entryType": "KroModIx.Plugin.CaptainOfIndustry.CaptainOfIndustryPlugin",
+  "minHostVersion": "1.18.0",
+  "targets": [
+    {
+      "gameId": "captain-of-industry",
+      "displayName": "Captain of Industry",
+      "steamAppId": 1594320,
+      "alternativeExecutableNames": ["CaptainOfIndustry.exe", "CaptainOfIndustry"],
+      "platforms": "Both"
+    }
+  ],
+  "updateSource": {
+    "kind": "github",
+    "repo": "KroModIx/KroModIx.Plugin.CaptainOfIndustry"
+  }
+}
