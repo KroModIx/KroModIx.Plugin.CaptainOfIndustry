@@ -48,6 +48,13 @@ internal static class Strings
         ["workshop.host_too_old"] = "Der Host unterstützt Workshop-Discovery nicht (Contracts < v1.17). App-Update erforderlich.",
         ["workshop.count"] = "{0} abonnierte(s) Workshop-Item(s).",
 
+        ["sources.header"] = "🐙  Kuratierte CoI-Mod-Repos auf GitHub",
+        ["sources.hint"] = "Viele CoI-Mods liegen auf GitHub, nicht im Workshop. Klick auf einen Eintrag oeffnet das Repo — Releases dort als .zip laden und im Downloads-Tab installieren.",
+        ["sources.count"] = "{0} kuratierte Quelle(n).",
+        ["sources.empty_hint"] = "Noch keine Community-Quellen eingetragen — sei der erste!",
+        ["sources.btn_open"] = "🐙  Repo öffnen",
+        ["sources.btn_contribute"] = "➕  Repo vorschlagen (PR)",
+
         ["installed.scanning"] = "Scanne Mods-Ordner …",
         ["installed.no_mods"] = "Keine Mods installiert.",
         ["installed.no_mods_hint"] = "Mods liegen unter {0}. Kopiere Mod-Ordner mit mod.json direkt dorthin oder nutze den Downloads-Tab für .zip-Import.",
@@ -103,6 +110,13 @@ internal static class Strings
         ["workshop.no_steam_app"] = "Not a Steam game — Workshop discovery unavailable.",
         ["workshop.host_too_old"] = "The host doesn't support Workshop discovery (Contracts < v1.17). Please update the app.",
         ["workshop.count"] = "{0} subscribed Workshop item(s).",
+
+        ["sources.header"] = "🐙  Curated CoI mod repos on GitHub",
+        ["sources.hint"] = "Many CoI mods live on GitHub, not the Workshop. Click an entry to open the repo — download releases as .zip and install via the Downloads tab.",
+        ["sources.count"] = "{0} curated source(s).",
+        ["sources.empty_hint"] = "No community sources listed yet — be the first!",
+        ["sources.btn_open"] = "🐙  Open repo",
+        ["sources.btn_contribute"] = "➕  Suggest repo (PR)",
 
         ["installed.scanning"] = "Scanning Mods folder …",
         ["installed.no_mods"] = "No mods installed.",

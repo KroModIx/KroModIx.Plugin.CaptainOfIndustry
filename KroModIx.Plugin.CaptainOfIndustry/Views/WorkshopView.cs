@@ -6,6 +6,7 @@ using Avalonia.Data;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
+using System.Collections;
 
 namespace KroModIx.Plugin.CaptainOfIndustry.Views;
 
@@ -61,15 +62,16 @@ public sealed class WorkshopView : UserControl
         };
         scroll.Bind(ScrollViewer.IsVisibleProperty, new Binding(nameof(WorkshopViewModel.HasRows)));
 
-        // Empty-State-Panel (sichtbar wenn Rows leer): CTA-Button „Workshop
-        // oeffnen" — der User hat wahrscheinlich noch nichts abonniert, wir
-        // zeigen den Weg dorthin statt einer nackten Fehlermeldung.
+        // Empty-State-Panel (sichtbar wenn Rows leer): CTA + kuratierte
+        // GitHub-Sources-Liste aus dem CoiModIndex-Meta-Repo. Damit der
+        // User im Leerzustand auch echten Nutzwert bekommt (viele CoI-
+        // Mods leben auf GitHub, nicht im Workshop).
         var emptyIcon = new TextBlock
         {
             Text = "\U0001F30D", // 🌍
             FontSize = 56,
             HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Thickness(0, 40, 0, 12),
+            Margin = new Thickness(0, 24, 0, 8),
         };
         emptyIcon.Classes.Add("muted");
         var emptyHint = new TextBlock
@@ -79,7 +81,7 @@ public sealed class WorkshopView : UserControl
             HorizontalAlignment = HorizontalAlignment.Center,
             TextAlignment = TextAlignment.Center,
             MaxWidth = 520,
-            Margin = new Thickness(0, 0, 0, 16),
+            Margin = new Thickness(0, 0, 0, 12),
         };
         emptyHint.Classes.Add("secondary");
         var emptyBtn = new Button
@@ -90,13 +92,62 @@ public sealed class WorkshopView : UserControl
         emptyBtn.Classes.Add("accent");
         emptyBtn.Bind(Button.CommandProperty,
             new Binding(nameof(WorkshopViewModel.OpenWorkshopHubCommand)));
+
+        var sourcesHeader = new TextBlock
+        {
+            Text = Strings.T("sources.header"),
+            FontWeight = FontWeight.SemiBold,
+            FontSize = 14,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 32, 0, 6),
+        };
+        var sourcesHint = new TextBlock
+        {
+            Text = Strings.T("sources.hint"),
+            TextWrapping = TextWrapping.Wrap,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            TextAlignment = TextAlignment.Center,
+            MaxWidth = 640,
+            Margin = new Thickness(0, 0, 0, 12),
+        };
+        sourcesHint.Classes.Add("secondary");
+
+        var sourcesList = new ItemsControl
+        {
+            Margin = new Thickness(0, 0, 0, 12),
+            MaxWidth = 720,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        sourcesList.Bind(ItemsControl.ItemsSourceProperty,
+            new Binding(nameof(WorkshopViewModel.Sources)));
+        sourcesList.ItemTemplate = new FuncDataTemplate<SourceRow>((row, _) =>
+            row is null ? null : BuildSourceCard(), true);
+
+        var contributeBtn = new Button
+        {
+            Content = Strings.T("sources.btn_contribute"),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 4, 0, 12),
+        };
+        contributeBtn.Classes.Add("ghost");
+        contributeBtn.Bind(Button.CommandProperty,
+            new Binding(nameof(WorkshopViewModel.OpenContributeSourcesCommand)));
+
         var emptyPanel = new StackPanel
         {
             Spacing = 4,
             VerticalAlignment = VerticalAlignment.Top,
-            Children = { emptyIcon, emptyHint, emptyBtn },
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Children = { emptyIcon, emptyHint, emptyBtn, sourcesHeader,
+                         sourcesHint, sourcesList, contributeBtn },
         };
-        emptyPanel.Bind(StackPanel.IsVisibleProperty,
+        var emptyScroll = new ScrollViewer
+        {
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Content = emptyPanel,
+        };
+        emptyScroll.Bind(ScrollViewer.IsVisibleProperty,
             new Binding(nameof(WorkshopViewModel.IsEmpty)));
 
         Content = new DockPanel
@@ -106,7 +157,7 @@ public sealed class WorkshopView : UserControl
             {
                 WithDock(toolbar, Dock.Top),
                 WithDock(status, Dock.Top),
-                WithDock(emptyPanel, Dock.Top),
+                WithDock(emptyScroll, Dock.Top),
                 scroll,
             },
         };
@@ -203,6 +254,68 @@ public sealed class WorkshopView : UserControl
         grid.Children.Add(coverFrame);
         grid.Children.Add(titleColumn);
         grid.Children.Add(actions);
+
+        var card = new Border { Margin = new Thickness(0, 0, 0, 6), Child = grid };
+        card.Classes.Add("card");
+        return card;
+    }
+
+    /// <summary>Row-Karte fuer einen kuratierten GitHub-Sources-Eintrag.
+    /// Klick oeffnet den Repo im Browser (via _host.Shell). Kein Cover,
+    /// kein Enrichment — nur DisplayName + Beschreibung + Repo-Slug.</summary>
+    private static Control BuildSourceCard()
+    {
+        var name = new TextBlock { FontWeight = FontWeight.SemiBold, FontSize = 13 };
+        name.Bind(TextBlock.TextProperty, new Binding(nameof(SourceRow.DisplayName)));
+
+        var repo = new TextBlock { FontSize = 11 };
+        repo.Classes.Add("muted");
+        repo.Bind(TextBlock.TextProperty, new Binding(nameof(SourceRow.Repo)));
+
+        var description = new TextBlock
+        {
+            FontSize = 11,
+            Margin = new Thickness(0, 4, 0, 0),
+            TextWrapping = TextWrapping.Wrap,
+        };
+        description.Classes.Add("secondary");
+        description.Bind(TextBlock.TextProperty, new Binding(nameof(SourceRow.Description)));
+
+        var tags = new TextBlock { FontSize = 10, Margin = new Thickness(0, 4, 0, 0) };
+        tags.Classes.Add("muted");
+        tags.Bind(TextBlock.TextProperty, new Binding(nameof(SourceRow.TagsLabel)));
+        tags.Bind(TextBlock.IsVisibleProperty, new Binding(nameof(SourceRow.HasTags)));
+
+        var textColumn = new StackPanel
+        {
+            Spacing = 2, VerticalAlignment = VerticalAlignment.Center,
+            Children = { name, repo, description, tags },
+        };
+
+        var openBtn = new Button
+        {
+            Content = Strings.T("sources.btn_open"),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(12, 0, 0, 0),
+        };
+        openBtn.Classes.Add("accent");
+        openBtn.Bind(Button.CommandProperty, new Binding
+        {
+            RelativeSource = new RelativeSource
+            { Mode = RelativeSourceMode.FindAncestor, AncestorType = typeof(ItemsControl) },
+            Path = "DataContext." + nameof(WorkshopViewModel.OpenSourceCommand),
+        });
+        openBtn.Bind(Button.CommandParameterProperty, new Binding("."));
+
+        var grid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+            Margin = new Thickness(12, 8),
+        };
+        Grid.SetColumn(textColumn, 0);
+        Grid.SetColumn(openBtn, 1);
+        grid.Children.Add(textColumn);
+        grid.Children.Add(openBtn);
 
         var card = new Border { Margin = new Thickness(0, 0, 0, 6), Child = grid };
         card.Classes.Add("card");

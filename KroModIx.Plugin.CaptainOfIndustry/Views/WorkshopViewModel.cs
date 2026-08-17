@@ -10,6 +10,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using KroModIx.Plugin.Contracts;
+using KroModIx.Plugin.CaptainOfIndustry.Services;
 
 namespace KroModIx.Plugin.CaptainOfIndustry.Views;
 
@@ -23,6 +24,7 @@ public sealed partial class WorkshopViewModel : ObservableObject
     private readonly DetectedGame _game;
     private readonly IHostServices _host;
     private readonly PreviewCoverCache _covers;
+    private readonly CoiSourcesService _sources;
 
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private bool _isBusy;
@@ -30,10 +32,12 @@ public sealed partial class WorkshopViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasRows))]
     private bool _isEmpty;
+    [ObservableProperty] private string _sourcesStatus = "";
 
     public bool HasRows => !IsEmpty;
 
     public ObservableCollection<WorkshopRow> Rows { get; } = new();
+    public ObservableCollection<SourceRow> Sources { get; } = new();
     private List<WorkshopRow> _allRows = new();
 
     public WorkshopViewModel(DetectedGame game, IHostServices host)
@@ -41,7 +45,31 @@ public sealed partial class WorkshopViewModel : ObservableObject
         _game = game;
         _host = host;
         _covers = new PreviewCoverCache(host, host.CreateHttpClient("coi-workshop-covers"));
+        _sources = new CoiSourcesService(host);
         _ = LoadAsync();
+        _ = LoadSourcesAsync();
+    }
+
+    /// <summary>Laedt die kuratierte GitHub-Repo-Liste aus dem
+    /// CoiModIndex-Meta-Repo. Faellt bei Netzfehler auf Cache zurueck.</summary>
+    private async Task LoadSourcesAsync()
+    {
+        try
+        {
+            var index = await _sources.GetAsync();
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                Sources.Clear();
+                foreach (var s in index.Sources) Sources.Add(new SourceRow(s));
+                SourcesStatus = Sources.Count == 0
+                    ? Strings.T("sources.empty_hint")
+                    : string.Format(Strings.T("sources.count"), Sources.Count);
+            });
+        }
+        catch (Exception ex)
+        {
+            _host.Logger.Debug(ex, "Sources-Load fehlgeschlagen");
+        }
     }
 
     partial void OnFilterTextChanged(string value) => ApplyFilter();
@@ -179,6 +207,34 @@ public sealed partial class WorkshopViewModel : ObservableObject
         if (row is null) return;
         _host.Shell.OpenDirectory(row.LocalDir);
     }
+
+    /// <summary>Oeffnet einen kuratierten GitHub-Mod-Repo aus der Sources-
+    /// Liste im Browser.</summary>
+    [RelayCommand]
+    private void OpenSource(SourceRow? row)
+    {
+        if (row is null) return;
+        _host.Shell.OpenExternalUrl(row.GitHubUrl);
+    }
+
+    /// <summary>Oeffnet den CoiModIndex-Repo — Weg fuer die Community
+    /// einen neuen Mod-Repo per PR vorzuschlagen.</summary>
+    [RelayCommand]
+    private void OpenContributeSources()
+        => _host.Shell.OpenExternalUrl(_sources.ContributeUrl);
+}
+
+public sealed class SourceRow
+{
+    public CoiSourceEntry Source { get; }
+    public SourceRow(CoiSourceEntry s) { Source = s; }
+    public string DisplayName => Source.DisplayName;
+    public string Repo => Source.Repo;
+    public string Description => Source.Description;
+    public string GitHubUrl => Source.GitHubUrl;
+    public string TagsLabel => Source.Tags is { Count: > 0 }
+        ? string.Join(" · ", Source.Tags) : "";
+    public bool HasTags => Source.Tags is { Count: > 0 };
 }
 
 public sealed partial class WorkshopRow : ObservableObject
