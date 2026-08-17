@@ -51,6 +51,7 @@ public sealed class WorkshopView : UserControl
         list.Bind(ListBox.ItemsSourceProperty, new Binding(nameof(WorkshopViewModel.Rows)));
         list.ItemTemplate = new FuncDataTemplate<WorkshopRow>((row, _) =>
             row is null ? null : BuildRowCard(), true);
+        list.Bind(ListBox.IsVisibleProperty, new Binding(nameof(WorkshopViewModel.HasRows)));
 
         var scroll = new ScrollViewer
         {
@@ -58,6 +59,45 @@ public sealed class WorkshopView : UserControl
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             Content = list,
         };
+        scroll.Bind(ScrollViewer.IsVisibleProperty, new Binding(nameof(WorkshopViewModel.HasRows)));
+
+        // Empty-State-Panel (sichtbar wenn Rows leer): CTA-Button „Workshop
+        // oeffnen" — der User hat wahrscheinlich noch nichts abonniert, wir
+        // zeigen den Weg dorthin statt einer nackten Fehlermeldung.
+        var emptyIcon = new TextBlock
+        {
+            Text = "\U0001F30D", // 🌍
+            FontSize = 56,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 40, 0, 12),
+        };
+        emptyIcon.Classes.Add("muted");
+        var emptyHint = new TextBlock
+        {
+            Text = Strings.T("workshop.no_items_hint"),
+            TextWrapping = TextWrapping.Wrap,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            TextAlignment = TextAlignment.Center,
+            MaxWidth = 520,
+            Margin = new Thickness(0, 0, 0, 16),
+        };
+        emptyHint.Classes.Add("secondary");
+        var emptyBtn = new Button
+        {
+            Content = Strings.T("btn.open_workshop_hub"),
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        emptyBtn.Classes.Add("accent");
+        emptyBtn.Bind(Button.CommandProperty,
+            new Binding(nameof(WorkshopViewModel.OpenWorkshopHubCommand)));
+        var emptyPanel = new StackPanel
+        {
+            Spacing = 4,
+            VerticalAlignment = VerticalAlignment.Top,
+            Children = { emptyIcon, emptyHint, emptyBtn },
+        };
+        emptyPanel.Bind(StackPanel.IsVisibleProperty,
+            new Binding(nameof(WorkshopViewModel.IsEmpty)));
 
         Content = new DockPanel
         {
@@ -66,6 +106,7 @@ public sealed class WorkshopView : UserControl
             {
                 WithDock(toolbar, Dock.Top),
                 WithDock(status, Dock.Top),
+                WithDock(emptyPanel, Dock.Top),
                 scroll,
             },
         };

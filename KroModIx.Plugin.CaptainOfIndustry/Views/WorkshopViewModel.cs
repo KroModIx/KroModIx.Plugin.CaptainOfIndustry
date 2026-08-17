@@ -27,6 +27,11 @@ public sealed partial class WorkshopViewModel : ObservableObject
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _filterText = "";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRows))]
+    private bool _isEmpty;
+
+    public bool HasRows => !IsEmpty;
 
     public ObservableCollection<WorkshopRow> Rows { get; } = new();
     private List<WorkshopRow> _allRows = new();
@@ -78,7 +83,8 @@ public sealed partial class WorkshopViewModel : ObservableObject
                 .Select(i => new WorkshopRow(i))
                 .ToList();
             ApplyFilter();
-            if (_allRows.Count == 0)
+            IsEmpty = _allRows.Count == 0;
+            if (IsEmpty)
             {
                 StatusText = Strings.T("workshop.no_items");
                 return;
@@ -139,6 +145,17 @@ public sealed partial class WorkshopViewModel : ObservableObject
         {
             _host.Logger.Debug(ex, "Workshop-Enrichment fehlgeschlagen");
         }
+    }
+
+    /// <summary>Deep-Link zum Steam-Workshop-Hub des Spiels — im Steam-Client
+    /// wenn moeglich (steam://openurl), sonst Browser. Nuetzlich vor allem im
+    /// Empty-State-Panel damit der User den Weg zum Abonnieren findet.</summary>
+    [RelayCommand]
+    private void OpenWorkshopHub()
+    {
+        if (_game.Target.SteamAppId is not int appId) return;
+        _host.Shell.OpenExternalUrl(
+            $"steam://openurl/https://steamcommunity.com/app/{appId}/workshop/");
     }
 
     [RelayCommand]
