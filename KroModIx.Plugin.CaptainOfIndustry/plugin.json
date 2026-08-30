@@ -2,18 +2,21 @@
   "schema": 1,
   "id": "kroste.captainofindustry",
   "displayName": "Captain of Industry Mod-Manager",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "author": "Kroste",
-  "description": "Mod-Verwaltung für Captain of Industry (MaFi Games, AppId 1594320). v0.3.1: Sources-Cards rendern gelbes ⚠-Warning-Chip wenn im Meta-Repo ein optionales warning-Feld gesetzt ist (Legal-Konflikt, Kompatibilitaets-Bruch, Adult-Content). v0.3.0: Workshop-Empty-State mit kuratierter GitHub-Sources-Liste aus KroModIx/KroModIx.CoiModIndex (6h-Cache). v0.2.0: Drei Tabs — Workshop, Installiert (mod.json-Discovery unter Docs/Captain of Industry/Mods/), Downloads (Local .zip-Import). v0.1.0: Workshop-Consumer. DE+EN. MinHostVersion 1.18.0.",
+  "description": "Mod-Verwaltung für Captain of Industry (MaFi Games). v0.4.0: Update-Discovery im Installiert-Tab — installierte Mods werden über die kuratierte Sources-Liste den GitHub-Releases zugeordnet, Badge + „Release öffnen\"-Button pro Row, Sidebar-Badge via IUpdateNotifier. v0.3.1: Sources-Cards rendern gelbes ⚠-Warning-Chip wenn im Meta-Repo ein optionales warning-Feld gesetzt ist (Legal-Konflikt, Kompatibilitaets-Bruch, Adult-Content). v0.3.0: Workshop-Empty-State mit kuratierter GitHub-Sources-Liste aus KroModIx/KroModIx.CoiModIndex (6h-Cache). v0.2.0: Drei Tabs — Workshop, Installiert (mod.json-Discovery unter Docs/Captain of Industry/Mods/), Downloads (Local .zip-Import). v0.1.0: Workshop-Consumer. DE+EN. MinHostVersion 1.18.0.",
   "assembly": "KroModIx.Plugin.CaptainOfIndustry.dll",
   "entryType": "KroModIx.Plugin.CaptainOfIndustry.CaptainOfIndustryPlugin",
-  "minHostVersion": "1.18.0",
+  "minHostVersion": "1.27.0",
   "targets": [
     {
       "gameId": "captain-of-industry",
       "displayName": "Captain of Industry",
       "steamAppId": 1594320,
-      "alternativeExecutableNames": ["CaptainOfIndustry.exe", "CaptainOfIndustry"],
+      "alternativeExecutableNames": [
+        "CaptainOfIndustry.exe",
+        "CaptainOfIndustry"
+      ],
       "platforms": "Both"
     }
   ],

@@ -18,6 +18,10 @@ public sealed class InstalledModsView : UserControl
         refreshBtn.Bind(Button.CommandProperty,
             new Binding(nameof(InstalledModsViewModel.RefreshCommand)));
 
+        var checkBtn = new Button { Content = Strings.T("btn.check_updates") };
+        checkBtn.Bind(Button.CommandProperty,
+            new Binding(nameof(InstalledModsViewModel.CheckUpdatesCommand)));
+
         var openBtn = new Button { Content = Strings.T("btn.open_folder") };
         openBtn.Classes.Add("ghost");
         openBtn.Bind(Button.CommandProperty,
@@ -27,7 +31,7 @@ public sealed class InstalledModsView : UserControl
         {
             Orientation = Orientation.Horizontal, Spacing = 8,
             Margin = new Thickness(0, 0, 0, 8),
-            Children = { refreshBtn, openBtn },
+            Children = { refreshBtn, checkBtn, openBtn },
         };
 
         var status = new TextBlock { Margin = new Thickness(0, 0, 0, 4) };
@@ -90,15 +94,39 @@ public sealed class InstalledModsView : UserControl
         var status = new TextBlock { FontSize = 10, FontWeight = FontWeight.SemiBold, Margin = new Thickness(0, 2, 0, 0) };
         status.Bind(TextBlock.TextProperty, new Binding(nameof(InstalledModRow.StatusLabel)));
 
+        // Update-Badge: nur sichtbar wenn der Checker fuer diese Row ein
+        // neueres Release gefunden hat.
+        var updateBadge = new Border
+        {
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(8, 2),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 4, 0, 0),
+            [!Border.BackgroundProperty] = new Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension("KrosteGoldBrush"),
+        };
+        var updateBadgeText = new TextBlock
+        {
+            FontSize = 10, FontWeight = FontWeight.SemiBold,
+            Foreground = Brushes.Black,
+        };
+        updateBadgeText.Bind(TextBlock.TextProperty, new Binding(nameof(InstalledModRow.UpdateBadgeText)));
+        updateBadge.Child = updateBadgeText;
+        updateBadge.Bind(Border.IsVisibleProperty, new Binding(nameof(InstalledModRow.HasUpdate)));
+
         var titleColumn = new StackPanel
         {
             Spacing = 2, VerticalAlignment = VerticalAlignment.Center,
-            Children = { name, subtitle, description, status },
+            Children = { name, subtitle, description, status, updateBadge },
         };
 
         var toggleBtn = new Button();
         toggleBtn.Bind(Button.ContentProperty, new Binding(nameof(InstalledModRow.ToggleButtonLabel)));
         BindRowCmd(toggleBtn, nameof(InstalledModsViewModel.ToggleEnabledCommand));
+
+        var releaseBtn = new Button { Content = Strings.T("btn.open_release") };
+        releaseBtn.Classes.Add("accent");
+        releaseBtn.Bind(Button.IsVisibleProperty, new Binding(nameof(InstalledModRow.HasUpdate)));
+        BindRowCmd(releaseBtn, nameof(InstalledModsViewModel.OpenReleaseCommand));
 
         var uninstallBtn = new Button { Content = Strings.T("btn.uninstall") };
         uninstallBtn.Classes.Add("danger");
@@ -107,7 +135,7 @@ public sealed class InstalledModsView : UserControl
         var actions = new StackPanel
         {
             Spacing = 6, VerticalAlignment = VerticalAlignment.Center,
-            Children = { toggleBtn, uninstallBtn },
+            Children = { releaseBtn, toggleBtn, uninstallBtn },
         };
 
         var grid = new Grid

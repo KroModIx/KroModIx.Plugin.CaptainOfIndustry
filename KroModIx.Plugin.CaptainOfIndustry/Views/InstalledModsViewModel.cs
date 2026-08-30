@@ -22,6 +22,7 @@ public sealed partial class InstalledModsViewModel : ObservableObject, IDisposab
     private readonly CoiInstallService _installer;
     private readonly CoiPathResolver _paths;
     private readonly DownloadEventBus _bus;
+    private readonly CoiUpdateChecker _updates;
     private readonly IHostServices _host;
     private readonly EventHandler _installedHandler;
 
@@ -34,10 +35,10 @@ public sealed partial class InstalledModsViewModel : ObservableObject, IDisposab
 
     public InstalledModsViewModel(DetectedGame game, CoiModScanner scanner,
         CoiInstallService installer, CoiPathResolver paths,
-        DownloadEventBus bus, IHostServices host)
+        DownloadEventBus bus, CoiUpdateChecker updates, IHostServices host)
     {
         _game = game; _scanner = scanner; _installer = installer;
-        _paths = paths; _bus = bus; _host = host;
+        _paths = paths; _bus = bus; _updates = updates; _host = host;
         _installedHandler = (_, _) => Dispatcher.UIThread.Post(() => _ = RefreshAsync());
         _bus.ModInstalled += _installedHandler;
         _ = RefreshAsync();
@@ -71,8 +72,57 @@ public sealed partial class InstalledModsViewModel : ObservableObject, IDisposab
                 ? Strings.T("installed.no_mods")
                 : string.Format(Strings.T("installed.count"), mods.Count, enabled, disabled);
             ApplyFilter();
+            ApplyKnownUpdates();
         }
         finally { IsBusy = false; }
+    }
+
+    /// <summary>Uebertraegt die Treffer des letzten Checks auf die Rows.
+    /// Laeuft auch nach jedem Refresh, damit die Badges einen Tab-Wechsel
+    /// ueberleben ohne neuen GitHub-Roundtrip.</summary>
+    private void ApplyKnownUpdates()
+    {
+        foreach (var candidate in _updates.Pending)
+        {
+            var row = _allRows.FirstOrDefault(r =>
+                string.Equals(r.Mod.FolderName, candidate.FolderName, StringComparison.OrdinalIgnoreCase));
+            row?.SetUpdateAvailable(candidate.LatestVersion, candidate.ReleaseUrl);
+        }
+    }
+
+    /// <summary>Update-Discovery gegen die kuratierte Sources-Liste
+    /// (GitHub-Releases). Bis v0.3.1 hatte der Installiert-Tab gar keine —
+    /// der User musste selbst auf GitHub nachsehen, ob sein Mod noch aktuell
+    /// ist.</summary>
+    [RelayCommand]
+    private async Task CheckUpdatesAsync()
+    {
+        if (IsBusy) return;
+        try
+        {
+            IsBusy = true;
+            StatusText = Strings.T("status.checking_updates");
+            var count = await _updates.CheckAsync(_game, force: true);
+            ApplyKnownUpdates();
+            StatusText = count == 0
+                ? Strings.T("status.no_updates")
+                : string.Format(Strings.T("status.updates_found"), count);
+            try { await _host.RequestUpdateBadgeRefreshAsync(); }
+            catch (Exception ex) { _host.Logger.Debug(ex, "Badge-Refresh fehlgeschlagen"); }
+        }
+        catch (Exception ex)
+        {
+            _host.Logger.Warn(ex, "Update-Check fehlgeschlagen");
+            StatusText = ex.Message;
+        }
+        finally { IsBusy = false; }
+    }
+
+    [RelayCommand]
+    private void OpenRelease(InstalledModRow? row)
+    {
+        if (row?.ReleaseUrl is not string url || url.Length == 0) return;
+        _host.Shell.OpenExternalUrl(url);
     }
 
     [RelayCommand]
@@ -148,6 +198,24 @@ public sealed partial class InstalledModRow : ObservableObject
     }
 
     public bool HasDescription => !string.IsNullOrWhiteSpace(Mod.Description);
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UpdateBadgeText))]
+    private bool _hasUpdate;
+
+    public string? LatestVersion { get; private set; }
+    public string? ReleaseUrl { get; private set; }
+
+    public string UpdateBadgeText => HasUpdate && LatestVersion is not null
+        ? string.Format(Strings.T("row.update_badge"), LatestVersion)
+        : "";
+
+    public void SetUpdateAvailable(string latestVersion, string releaseUrl)
+    {
+        LatestVersion = latestVersion;
+        ReleaseUrl = releaseUrl;
+        HasUpdate = true;
+    }
 
     public void OnModChanged()
     {
