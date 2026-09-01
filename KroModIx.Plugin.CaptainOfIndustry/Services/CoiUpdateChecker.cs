@@ -65,7 +65,16 @@ public sealed class CoiUpdateChecker
             return _pending.Count;
 
         List<CoiMod> installed;
-        try { installed = _scanner.Scan(game).ToList(); }
+        try
+        {
+            // v0.4.1: Task.Run ist Pflicht, nicht Deko. CheckAsync wird aus dem
+            // CheckUpdatesCommand aufgerufen, also vom UI-Thread — und async
+            // schuetzt davor nicht: bis zum ersten await laeuft alles auf dem
+            // Caller-Thread. Der Mod-Scan liest das Mods-Verzeichnis samt
+            // mod.json pro Ordner und fror damit die Sidebar ein
+            // (Kernprinzip 3).
+            installed = await Task.Run(() => _scanner.Scan(game).ToList(), ct).ConfigureAwait(false);
+        }
         catch (Exception ex)
         {
             Log.Warn(ex, "Update-Check: Mod-Scan fehlgeschlagen");
@@ -88,6 +97,13 @@ public sealed class CoiUpdateChecker
         // GitHub verlangt einen User-Agent, sonst 403 auf jeden API-Call.
         http.DefaultRequestHeaders.UserAgent.ParseAdd("KroModIx-CoI-UpdateCheck");
 
+        // v0.4.1: Der Redirect-Chase-Client wird einmal pro Check gebaut und
+        // lazy initialisiert — vorher entstand pro Rate-Limit-Treffer ein
+        // neuer Handler samt Client.
+        HttpClient? noRedirect = null;
+        try
+        {
+
         var found = new List<CoiUpdateCandidate>();
         foreach (var mod in installed)
         {
@@ -96,7 +112,8 @@ public sealed class CoiUpdateChecker
             if (source is null) continue;
             if (string.IsNullOrWhiteSpace(mod.Version)) continue;
 
-            var tag = await TryGetLatestTagAsync(http, source.Repo, ct).ConfigureAwait(false);
+            var tag = await TryGetLatestTagAsync(http, source.Repo,
+                () => noRedirect ??= CreateNoRedirectClient(), ct).ConfigureAwait(false);
             if (tag is null) continue;
             if (!VersionCompare.IsNewer(tag, mod.Version)) continue;
 
@@ -109,10 +126,21 @@ public sealed class CoiUpdateChecker
                 ReleaseUrl: $"https://github.com/{source.Repo}/releases/latest"));
         }
 
-        _pending = found;
-        _lastCheckUtc = DateTime.UtcNow;
-        Log.Info("CoI-Update-Check: {N} Update(s) fuer {Installed} Mod(s)", found.Count, installed.Count);
-        return found.Count;
+            _pending = found;
+            _lastCheckUtc = DateTime.UtcNow;
+            Log.Info("CoI-Update-Check: {N} Update(s) fuer {Installed} Mod(s)", found.Count, installed.Count);
+            return found.Count;
+        }
+        finally { noRedirect?.Dispose(); }
+    }
+
+    private HttpClient CreateNoRedirectClient()
+    {
+        var handler = _host.CreateHttpClientHandler();
+        handler.AllowAutoRedirect = false;
+        var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(20) };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("KroModIx-CoI-UpdateCheck");
+        return client;
     }
 
     /// <summary>Ordnet einen installierten Mod einem Source-Eintrag zu.
@@ -155,7 +183,8 @@ public sealed class CoiUpdateChecker
         return new string(buffer[..n]);
     }
 
-    private async Task<string?> TryGetLatestTagAsync(HttpClient http, string repo, CancellationToken ct)
+    private async Task<string?> TryGetLatestTagAsync(HttpClient http, string repo,
+        Func<HttpClient> noRedirectFactory, CancellationToken ct)
     {
         try
         {
@@ -164,7 +193,7 @@ public sealed class CoiUpdateChecker
             if (resp.StatusCode == HttpStatusCode.Forbidden || resp.StatusCode == HttpStatusCode.TooManyRequests)
             {
                 Log.Debug("GitHub-API Rate-Limit fuer {Repo} — Redirect-Chase", repo);
-                return await TryRedirectChaseAsync(repo, ct).ConfigureAwait(false);
+                return await TryRedirectChaseAsync(noRedirectFactory(), repo, ct).ConfigureAwait(false);
             }
             if (!resp.IsSuccessStatusCode)
             {
@@ -186,14 +215,11 @@ public sealed class CoiUpdateChecker
 
     /// <summary>Ohne API: /releases/latest antwortet mit 302 auf
     /// /releases/tag/&lt;tag&gt;. Kostet kein Rate-Limit-Budget.</summary>
-    private async Task<string?> TryRedirectChaseAsync(string repo, CancellationToken ct)
+    private static async Task<string?> TryRedirectChaseAsync(HttpClient noRedirect, string repo,
+        CancellationToken ct)
     {
         try
         {
-            var handler = _host.CreateHttpClientHandler();
-            handler.AllowAutoRedirect = false;
-            using var noRedirect = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(20) };
-            noRedirect.DefaultRequestHeaders.UserAgent.ParseAdd("KroModIx-CoI-UpdateCheck");
             using var resp = await noRedirect.GetAsync(
                 $"https://github.com/{repo}/releases/latest", ct).ConfigureAwait(false);
             var location = resp.Headers.Location?.ToString();
