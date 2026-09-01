@@ -40,6 +40,29 @@ public sealed partial class DownloadsViewModel : ObservableObject, IDisposable
 
     public void Dispose() { }
 
+    /// <summary>Snapshot VOR jedem File-Write (Kernprinzip 6). Fehler
+    /// duerfen den Install NIEMALS blockieren — der User will installieren,
+    /// nicht den Backup-Service debuggen. Zurueckspielen laeuft ueber das
+    /// Backups-Fenster (Sidebar-Kontextmenue), bewusst ohne Auto-Rollback.</summary>
+    private async Task TrySnapshotAsync(string label)
+    {
+        try
+        {
+            var dirs = new List<string>();
+            if (Directory.Exists(_installer.GetModsDir(_game))) dirs.Add(_installer.GetModsDir(_game));
+            if (dirs.Count == 0) return;
+            var gameKey = _game.Target.SteamAppId is int appId ? $"steam:{appId}" : _game.InstallDir;
+            await _host.Backup.CreateSnapshotAsync(
+                pluginId: "kroste.captainofindustry", gameKey: gameKey,
+                directories: dirs, label: label);
+            await _host.Backup.PruneAsync("kroste.captainofindustry", gameKey, keepLast: 10);
+        }
+        catch (Exception ex)
+        {
+            _host.Logger.Warn(ex, "Snapshot fehlgeschlagen (Install laeuft trotzdem): {Label}", label);
+        }
+    }
+
     [RelayCommand]
     private void Refresh()
     {
@@ -70,6 +93,7 @@ public sealed partial class DownloadsViewModel : ObservableObject, IDisposable
         {
             IsBusy = true;
             using var scope = _host.BeginProgress(string.Format(Strings.T("downloads.installing"), row.FileName));
+            await TrySnapshotAsync($"Vor Install von {row.FileName}");
             var result = await Task.Run(() => _installer.Install(row.FilePath, _game));
             var msg = result.Success
                 ? string.Format(Strings.T("downloads.install_ok"), result.Message)
@@ -97,6 +121,9 @@ public sealed partial class DownloadsViewModel : ObservableObject, IDisposable
         if (!ok) return;
         int done = 0, failed = 0;
         var snapshot = Rows.ToList();
+        // Bulk: EIN Snapshot vor der ganzen Schleife, nicht pro Row — beim
+        // Rollback will der User zurueck auf den Stand VOR dem Batch.
+        await TrySnapshotAsync($"Vor Bulk-Install ({Rows.Count} Archive)");
         using var scope = _host.BeginProgress("Bulk-Install …");
         foreach (var row in snapshot)
         {

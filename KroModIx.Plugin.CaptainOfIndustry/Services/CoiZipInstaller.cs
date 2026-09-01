@@ -27,6 +27,10 @@ public sealed class CoiZipInstaller
 
     public CoiZipInstaller(CoiPathResolver paths) => _paths = paths;
 
+    /// <summary>Ziel-Verzeichnis des Installs — fuer Backup-Snapshots vor dem
+    /// Schreiben. Legt nichts an.</summary>
+    public string GetModsDir(DetectedGame game) => _paths.GetModsDir(game);
+
     public CoiZipInstallResult Install(string archivePath, DetectedGame game)
     {
         if (!File.Exists(archivePath))
