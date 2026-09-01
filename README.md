@@ -6,12 +6,24 @@
 **Captain of Industry Mod-Manager** — Plugin für den
 [KroModIx](https://github.com/KroModIx/KroModIx).
 
-Reiner Workshop-Consumer für Captain of Industry (MaFi Games, Steam
-AppId 1594320). Listet die vom User abonnierten Steam-Workshop-Items
-mit Cover, Titel, Autor, Subscriber-Count. Un/Subscribe bleibt beim
-Steam-Client — das Plugin bietet nur Discovery und Deep-Links.
+Mod-Verwaltung für Captain of Industry (MaFi Games, Steam AppId 1594320)
+in drei Tabs: **Workshop** (abonnierte Steam-Workshop-Items plus eine
+kuratierte Liste von GitHub-Mod-Repos), **Installiert** (manuelle Mods im
+Docs-Mods-Ordner, inklusive Update-Erkennung gegen die GitHub-Releases) und
+**Downloads** (lokale `.zip`-Dateien installieren).
 
-## Features (v0.1.0)
+## Voraussetzungen
+
+Braucht den [KroModIx-Host](https://github.com/KroModIx/KroModIx) **ab
+v1.27.0** — dort sitzen der Backup-Baukasten und der gemeinsame
+Versions-Vergleich, gegen die dieses Plugin gebaut ist. Ältere Hosts laden
+das Plugin nicht.
+
+## Screenshot
+
+![Workshop-Tab mit der kuratierten GitHub-Sources-Liste](docs/screenshot.png)
+
+## Features
 
 ### Workshop-Tab
 
@@ -27,12 +39,34 @@ Steam-Client — das Plugin bietet nur Discovery und Deep-Links.
 - **Filter-Textbox** live nach Titel/Autor/Workshop-ID.
 - Sortierung: zuletzt lokal aktualisiert zuerst.
 
+### Installiert-Tab
+
+- Discovery aller Mod-Ordner mit `mod.json` im Docs-Mods-Verzeichnis,
+  Fallback auf den Ordnernamen wenn die `mod.json` fehlt oder kaputt ist —
+  der Mod bleibt sichtbar und lässt sich deinstallieren.
+- Aktivieren/Deaktivieren über ein `.disabled`-Suffix am Ordner, Uninstall
+  mit Rückfrage, Filter-Textbox.
+- **„🔄 Updates prüfen"**: ordnet installierte Mods über den Namen der
+  kuratierten Sources-Liste zu und vergleicht die Version aus der `mod.json`
+  mit dem neuesten GitHub-Release-Tag. Treffer bekommen ein Update-Badge und
+  einen **„⬆ Release öffnen"**-Button; die Sidebar-Kachel zeigt den grünen
+  ↑-Badge.
+
+### Downloads-Tab
+
+- Listet `.zip`-Dateien aus dem Plugin-Downloads-Ordner, Install einzeln
+  oder als Bulk.
+- **Vor jedem Install** legt das Plugin einen Backup-Snapshot des
+  Mods-Verzeichnisses an (Bulk: einer vor dem ganzen Durchlauf).
+  Zurückspielen über das Backups-Fenster im Sidebar-Kontextmenü.
+
 ### Was das Plugin **nicht** macht
 
 - Kein Un/Subscribe (macht Steam).
 - Kein Nexus (CoI ist Workshop-only).
-- Kein manueller Install (kein `.zip`-Download).
-- Kein IUpdateNotifier (Steam handhabt Updates automatisch).
+- Kein Auto-Download von Updates — CoI-Mods kommen als ZIP von GitHub, das
+  Plugin verlinkt das Release und installiert es über den Downloads-Tab.
+- Keine Update-Erkennung für Workshop-Mods (die aktualisiert Steam selbst).
 
 ### Sprachumschaltung
 
@@ -45,6 +79,18 @@ die frischen Übersetzungen aktiv (Host-Tab-Cache-Invalidate seit v1.14.7).
 dotnet build -c Release
 dotnet test
 ```
+
+## Backups vor jedem Install
+
+Bevor das Plugin Dateien ins Spiel schreibt, legt es einen Snapshot des
+Ziel-Verzeichnisses an — bei Einzel-Installs einen pro Mod, bei Bulk-Installs
+**einen** vor dem ganzen Durchlauf. Zurückspielen läuft über das
+Backups-Fenster im Kontextmenü der Sidebar-Kachel; es gibt bewusst kein
+Auto-Rollback, damit du entscheidest, welchen Stand du zurückholst.
+Aufbewahrt werden die letzten zehn Snapshots pro Spiel.
+
+Schlägt ein Snapshot fehl, läuft der Install trotzdem durch (mit Log-Eintrag)
+— das Backup ist ein Netz, kein Türsteher.
 
 ## Lizenz
 
