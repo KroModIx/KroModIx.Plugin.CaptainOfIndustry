@@ -59,7 +59,7 @@ public sealed class CaptainOfIndustryPlugin : IGameModPlugin, IUpdateNotifier
         _paths = new CoiPathResolver();
         _scanner = new CoiModScanner(_paths);
         _installer = new CoiInstallService();
-        _zipInstaller = new CoiZipInstaller(_paths);
+        _zipInstaller = new CoiZipInstaller(host.Archives, _paths);
         _pluginPaths = new CoiPaths(host);
         _bus = new DownloadEventBus();
         _sources = new CoiSourcesService(host);

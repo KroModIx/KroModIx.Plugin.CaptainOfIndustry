@@ -1,14 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using KroModIx.Plugin.Contracts;
 using NLog;
 
 namespace KroModIx.Plugin.CaptainOfIndustry.Services;
 
-/// <summary>Installiert ein .zip-Archiv in den CoI-Mods-Ordner. Auto-Layout-
+/// <summary>Installiert ein Mod-Archiv in den CoI-Mods-Ordner. Auto-Layout-
 /// Detection:
 /// <list type="bullet">
 /// <item>Archiv enthaelt <c>mod.json</c> im Root → wird als eigener Mod-
@@ -17,42 +16,67 @@ namespace KroModIx.Plugin.CaptainOfIndustry.Services;
 /// dieser Ordner wird als Mod-Ordner nach Mods/ extrahiert.</item>
 /// <item>Kein mod.json → Fehler „Kein CoI-Mod erkennbar".</item>
 /// </list>
-/// Nur .zip — RAR/7z brauchen SharpCompress, das bringt der reine
-/// Workshop-Consumer sonst nicht ins Bundle. Kann in v0.3+ dazukommen
-/// wenn ein User es braucht.</summary>
+///
+/// <para><b>Seit v0.6.0 über <c>IHostServices.Archives</c></b> (Host
+/// v1.32.0), und damit <b>auch RAR und 7z</b>. Vorher war das auf ZIP
+/// begrenzt, mit der Begründung, SharpCompress lohne sich für einen reinen
+/// Workshop-Consumer nicht im Bundle — der Host bringt es mit, die
+/// Begründung ist entfallen.</para>
+///
+/// <para><b>Der eigene Ausbruch-Schutz prüfte <c>Contains("..")</c>.</b> Das
+/// lässt einen absoluten Eintragsnamen durch, und <c>Path.Combine</c>
+/// verwirft dann das Zielverzeichnis. Am Cyberpunk-Installer, der dieselbe
+/// Prüfung trug, am 03.10.2026 nachgewiesen: die Datei landete außerhalb des
+/// Spiels, und der Install meldete Erfolg. Der Mod-Ordner je
+/// <c>mod.json</c> entsteht jetzt über
+/// <see cref="ArchiveExtractOptions.StripPrefix"/> statt über eigene
+/// Pfad-Arithmetik.</para></summary>
 public sealed class CoiZipInstaller
 {
     private static readonly Logger Log = LogManager.GetCurrentClassLogger();
+    private readonly IArchiveService _archives;
     private readonly CoiPathResolver _paths;
 
-    public CoiZipInstaller(CoiPathResolver paths) => _paths = paths;
+    public CoiZipInstaller(IArchiveService archives, CoiPathResolver paths)
+    {
+        _archives = archives;
+        _paths = paths;
+    }
 
     /// <summary>Ziel-Verzeichnis des Installs — fuer Backup-Snapshots vor dem
     /// Schreiben. Legt nichts an.</summary>
     public string GetModsDir(DetectedGame game) => _paths.GetModsDir(game);
 
+    /// <summary>Endungs-Vorfilter fuer den Downloads-Tab. Kommt aus dem
+    /// Host-Baukasten, damit ein dort neu unterstuetztes Format nicht in
+    /// neun Plugins nachgetragen werden muss.</summary>
+    public IReadOnlyList<string> SupportedExtensions => _archives.SupportedExtensions;
+
+    public bool HasSupportedExtension(string path) => _archives.HasSupportedExtension(path);
+
     public CoiZipInstallResult Install(string archivePath, DetectedGame game)
     {
         if (!File.Exists(archivePath))
             return CoiZipInstallResult.Fail($"Archiv nicht gefunden: {archivePath}");
-        var ext = Path.GetExtension(archivePath).ToLowerInvariant();
-        if (ext != ".zip")
+
+        // Am Inhalt pruefen, nicht an der Endung: ein Download mit falscher
+        // Endung landete sonst unveraendert im Spiel.
+        if (_archives.DetectKind(archivePath) == ArchiveKind.Unknown)
             return CoiZipInstallResult.Fail(
-                $"Nur .zip unterstuetzt (dieser Datei-Typ: {ext}).");
+                "Das ist kein lesbares Archiv (ZIP/RAR/7z) — eventuell ein abgebrochener Download.");
 
         var modsDir = _paths.EnsureModsDir(game);
 
         try
         {
-            using var zip = ZipFile.OpenRead(archivePath);
-            var entries = zip.Entries.Where(e => !string.IsNullOrEmpty(e.FullName)).ToList();
+            var entries = _archives.List(archivePath);
             if (entries.Count == 0)
                 return CoiZipInstallResult.Fail("Archiv ist leer.");
 
             // Kandidaten fuer mod.json finden (root oder ein Root-Ordner).
             var modJsonEntries = entries.Where(e =>
-                e.FullName.EndsWith("/mod.json", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(e.FullName, "mod.json", StringComparison.OrdinalIgnoreCase))
+                e.Path.EndsWith("/mod.json", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(e.Path, "mod.json", StringComparison.OrdinalIgnoreCase))
                 .ToList();
             if (modJsonEntries.Count == 0)
                 return CoiZipInstallResult.Fail(
@@ -60,38 +84,54 @@ public sealed class CoiZipInstaller
 
             var installedFiles = new List<string>();
             var modFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var abgelehnt = new List<string>();
 
             foreach (var mj in modJsonEntries)
             {
-                string prefix, folderName;
-                var slash = mj.FullName.LastIndexOf('/');
+                string? prefix;
+                string folderName;
+                var slash = mj.Path.LastIndexOf('/');
                 if (slash < 0)
                 {
                     // mod.json im Archiv-Root → Ordner-Name aus Archiv-Filename.
-                    prefix = "";
+                    prefix = null;
                     folderName = SanitizeFolder(Path.GetFileNameWithoutExtension(archivePath));
                 }
                 else
                 {
-                    prefix = mj.FullName.Substring(0, slash + 1);
-                    folderName = new DirectoryInfo(prefix.TrimEnd('/')).Name;
+                    prefix = mj.Path[..slash];
+                    folderName = new DirectoryInfo(prefix).Name;
                 }
                 var target = Path.Combine(modsDir, folderName);
                 Directory.CreateDirectory(target);
                 modFolders.Add(target);
 
-                foreach (var e in entries.Where(x => x.FullName.StartsWith(prefix,
-                    StringComparison.OrdinalIgnoreCase)))
-                {
-                    var rel = prefix.Length == 0 ? e.FullName : e.FullName.Substring(prefix.Length);
-                    if (string.IsNullOrEmpty(rel) || rel.EndsWith("/")) continue;
-                    if (rel.Contains("..")) { Log.Warn("Zip-Slip: {N}", rel); continue; }
-                    var dst = Path.Combine(target, rel.Replace('/', Path.DirectorySeparatorChar));
-                    Directory.CreateDirectory(Path.GetDirectoryName(dst)!);
-                    e.ExtractToFile(dst, overwrite: true);
-                    installedFiles.Add(dst);
-                }
+                var r = _archives.Extract(archivePath, target,
+                    new ArchiveExtractOptions(StripPrefix: prefix));
+                installedFiles.AddRange(r.ExtractedPaths);
+                abgelehnt.AddRange(r.SkippedUnsafe);
             }
+
+            // Ein Ausbruchsversuch bricht den Install ab, statt still das zu
+            // installieren was durchkam. Das trifft auch ein bloss kaputtes
+            // Archiv mit einem krummen Eintrag unter zweihundert; bewusst,
+            // denn ein Archiv das aus dem Mods-Ordner herausschreiben will
+            // ist nicht "ueberwiegend in Ordnung", und die Entscheidung
+            // gehoert dem Nutzer.
+            if (abgelehnt.Count > 0)
+            {
+                Log.Warn("Ausbruchsversuch im Archiv, {Count} Eintrag/Einträge abgelehnt: {Entries}",
+                    abgelehnt.Count, string.Join(", ", abgelehnt));
+                return new CoiZipInstallResult(false,
+                    $"Abgebrochen: {abgelehnt.Count} Eintrag/Einträge wollten aus dem "
+                    + "Mods-Ordner herausschreiben — "
+                    + string.Join(", ", abgelehnt.Take(3))
+                    + (abgelehnt.Count > 3 ? ", …" : "")
+                    + $". {installedFiles.Count} Datei(en) waren schon geschrieben, "
+                    + "bevor das auffiel.",
+                    installedFiles, modFolders.ToList());
+            }
+
             return CoiZipInstallResult.Ok(
                 $"{modFolders.Count} Mod-Ordner extrahiert ({installedFiles.Count} Datei(en)).",
                 installedFiles, modFolders.ToList());

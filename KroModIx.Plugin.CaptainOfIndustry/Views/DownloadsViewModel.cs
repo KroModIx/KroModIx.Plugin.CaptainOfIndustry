@@ -73,7 +73,10 @@ public sealed partial class DownloadsViewModel : ObservableObject, IDisposable
             StatusText = string.Format(Strings.T("downloads.no_dir"), dir);
             return;
         }
-        var files = Directory.EnumerateFiles(dir, "*.zip", SearchOption.TopDirectoryOnly)
+        // v0.6.0: nicht mehr nur *.zip — der Host-Baukasten kann auch RAR
+        // und 7z, und welche Endungen das sind, weiss er selbst.
+        var files = Directory.EnumerateFiles(dir, "*", SearchOption.TopDirectoryOnly)
+            .Where(_installer.HasSupportedExtension)
             .OrderByDescending(f => new FileInfo(f).CreationTimeUtc)
             .ToList();
         foreach (var f in files) Rows.Add(new DownloadRow(f));

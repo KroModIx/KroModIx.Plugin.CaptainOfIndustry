@@ -1,9 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using KroModIx.Plugin.Contracts;
@@ -28,10 +25,18 @@ namespace KroModIx.Plugin.CaptainOfIndustry.Services;
 /// <para><b>Workshop-Mods sind bewusst aussen vor</b> — die aktualisiert
 /// Steam selbst, ein zweiter Update-Kanal waere nur verwirrend.</para>
 ///
-/// <para>Rate-Limit: die GitHub-API erlaubt unauthentifiziert 60 Requests/h
-/// pro IP. Deshalb 6h-TTL auf dem Ergebnis und bei HTTP 403 der
-/// Redirect-Chase auf <c>/releases/latest</c> (kein API-Call, kein Limit) —
-/// dasselbe Muster wie im Host-PluginUpdateService.</para></summary>
+/// <para><b>Rate-Limit: seit v0.6.0 über <c>IHostServices.GitHub</c></b>
+/// (Host v1.32.0). Die GitHub-API erlaubt unauthentifiziert 60 Anfragen pro
+/// Stunde; der Host-Baukasten merkt sich die Sperre <b>einmal für alle</b>
+/// Aufrufer und weicht dann auf den Umleitungs-Pfad aus
+/// (<c>/releases/latest</c> ohne Folgen der Umleitung, kein API-Aufruf).
+/// Das ist hier mehr als eine gesparte Zeile: diese Prüfung läuft in einer
+/// Schleife über <b>alle</b> installierten Mods. Vorher entdeckte sie das
+/// Limit für jedes Repo neu — eine verbrannte Anfrage plus einen
+/// Umleitungs-Aufruf, Mod für Mod. Die 6h-TTL auf dem Ergebnis bleibt.</para>
+///
+/// <para>Ein <c>GITHUB_TOKEN</c> in der Umgebung hebt das Limit auf 5000
+/// Anfragen pro Stunde; der Host nimmt es automatisch mit.</para></summary>
 public sealed class CoiUpdateChecker
 {
     private static readonly Logger Log = LogManager.GetCurrentClassLogger();
@@ -90,20 +95,6 @@ public sealed class CoiUpdateChecker
         var index = await _sources.GetAsync().ConfigureAwait(false);
         if (index.Sources.Count == 0) return _pending.Count;
 
-        using var http = new HttpClient(_host.CreateHttpClientHandler())
-        {
-            Timeout = TimeSpan.FromSeconds(20),
-        };
-        // GitHub verlangt einen User-Agent, sonst 403 auf jeden API-Call.
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("KroModIx-CoI-UpdateCheck");
-
-        // v0.4.1: Der Redirect-Chase-Client wird einmal pro Check gebaut und
-        // lazy initialisiert — vorher entstand pro Rate-Limit-Treffer ein
-        // neuer Handler samt Client.
-        HttpClient? noRedirect = null;
-        try
-        {
-
         var found = new List<CoiUpdateCandidate>();
         foreach (var mod in installed)
         {
@@ -112,35 +103,27 @@ public sealed class CoiUpdateChecker
             if (source is null) continue;
             if (string.IsNullOrWhiteSpace(mod.Version)) continue;
 
-            var tag = await TryGetLatestTagAsync(http, source.Repo,
-                () => noRedirect ??= CreateNoRedirectClient(), ct).ConfigureAwait(false);
-            if (tag is null) continue;
-            if (!VersionCompare.IsNewer(tag, mod.Version)) continue;
+            var release = await _host.GitHub.GetLatestReleaseAsync(source.Repo, ct)
+                .ConfigureAwait(false);
+            if (release is null) continue;
+            if (!VersionCompare.IsNewer(release.Tag, mod.Version)) continue;
 
             found.Add(new CoiUpdateCandidate(
                 InstalledName: mod.DisplayName,
                 FolderName: mod.FolderName,
                 InstalledVersion: mod.Version!,
-                LatestVersion: tag,
+                LatestVersion: release.Tag,
                 Repo: source.Repo,
-                ReleaseUrl: $"https://github.com/{source.Repo}/releases/latest"));
+                ReleaseUrl: release.HtmlUrl
+                            ?? $"https://github.com/{source.Repo}/releases/latest"));
         }
 
-            _pending = found;
-            _lastCheckUtc = DateTime.UtcNow;
-            Log.Info("CoI-Update-Check: {N} Update(s) fuer {Installed} Mod(s)", found.Count, installed.Count);
-            return found.Count;
-        }
-        finally { noRedirect?.Dispose(); }
-    }
-
-    private HttpClient CreateNoRedirectClient()
-    {
-        var handler = _host.CreateHttpClientHandler();
-        handler.AllowAutoRedirect = false;
-        var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(20) };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("KroModIx-CoI-UpdateCheck");
-        return client;
+        _pending = found;
+        _lastCheckUtc = DateTime.UtcNow;
+        Log.Info("CoI-Update-Check: {N} Update(s) fuer {Installed} Mod(s){Limit}",
+            found.Count, installed.Count,
+            _host.GitHub.IsRateLimited ? " (GitHub-Limit erreicht, Angaben koennen veralten)" : "");
+        return found.Count;
     }
 
     /// <summary>Ordnet einen installierten Mod einem Source-Eintrag zu.
@@ -183,56 +166,6 @@ public sealed class CoiUpdateChecker
         return new string(buffer[..n]);
     }
 
-    private async Task<string?> TryGetLatestTagAsync(HttpClient http, string repo,
-        Func<HttpClient> noRedirectFactory, CancellationToken ct)
-    {
-        try
-        {
-            using var resp = await http.GetAsync(
-                $"https://api.github.com/repos/{repo}/releases/latest", ct).ConfigureAwait(false);
-            if (resp.StatusCode == HttpStatusCode.Forbidden || resp.StatusCode == HttpStatusCode.TooManyRequests)
-            {
-                Log.Debug("GitHub-API Rate-Limit fuer {Repo} — Redirect-Chase", repo);
-                return await TryRedirectChaseAsync(noRedirectFactory(), repo, ct).ConfigureAwait(false);
-            }
-            if (!resp.IsSuccessStatusCode)
-            {
-                Log.Debug("Kein Release fuer {Repo}: HTTP {Code}", repo, (int)resp.StatusCode);
-                return null;
-            }
-            var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            using var doc = JsonDocument.Parse(json);
-            return doc.RootElement.TryGetProperty("tag_name", out var tag)
-                ? tag.GetString()
-                : null;
-        }
-        catch (Exception ex)
-        {
-            Log.Debug(ex, "Release-Abfrage fehlgeschlagen: {Repo}", repo);
-            return null;
-        }
-    }
-
-    /// <summary>Ohne API: /releases/latest antwortet mit 302 auf
-    /// /releases/tag/&lt;tag&gt;. Kostet kein Rate-Limit-Budget.</summary>
-    private static async Task<string?> TryRedirectChaseAsync(HttpClient noRedirect, string repo,
-        CancellationToken ct)
-    {
-        try
-        {
-            using var resp = await noRedirect.GetAsync(
-                $"https://github.com/{repo}/releases/latest", ct).ConfigureAwait(false);
-            var location = resp.Headers.Location?.ToString();
-            if (string.IsNullOrEmpty(location)) return null;
-            var idx = location.IndexOf("/tag/", StringComparison.Ordinal);
-            return idx < 0 ? null : location[(idx + 5)..];
-        }
-        catch (Exception ex)
-        {
-            Log.Debug(ex, "Redirect-Chase fehlgeschlagen: {Repo}", repo);
-            return null;
-        }
-    }
 }
 
 /// <summary>Ein gefundenes Update. <see cref="ReleaseUrl"/> zeigt auf die

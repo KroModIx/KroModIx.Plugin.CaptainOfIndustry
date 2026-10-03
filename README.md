@@ -15,9 +15,9 @@ Docs-Mods-Ordner, inklusive Update-Erkennung gegen die GitHub-Releases) und
 ## Voraussetzungen
 
 Braucht den [KroModIx-Host](https://github.com/KroModIx/KroModIx) **ab
-v1.27.0** — dort sitzen der Backup-Baukasten und der gemeinsame
-Versions-Vergleich, gegen die dieses Plugin gebaut ist. Ältere Hosts laden
-das Plugin nicht.
+v1.33.0** — dort sitzen der Backup-Baukasten, der gemeinsame
+Versions-Vergleich und seit v0.6.0 der Archiv- und der GitHub-Baukasten,
+gegen die dieses Plugin gebaut ist. Ältere Hosts laden das Plugin nicht.
 
 ## Screenshot
 
