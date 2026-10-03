@@ -28,7 +28,16 @@ public sealed class CoiPathResolver
     {
         foreach (var candidate in EnumerateCandidates(game))
         {
-            if (Directory.Exists(candidate)) return candidate;
+            // v0.5.0: ueber ModFolderDiscovery statt Directory.Exists — unter
+            // Linux liegt der Mods-Ordner im Proton-Prefix mal als „Mods", mal
+            // als „mods", und Wine schreibt „My Documents" bzw. „Documents"
+            // uneinheitlich. Exakte Pruefung hat das uebersehen, obwohl das
+            // Spiel die Mods geladen hat.
+            var root = Path.GetDirectoryName(candidate);
+            var leaf = Path.GetFileName(candidate);
+            if (root is null || leaf is null) continue;
+            var hit = ModFolderDiscovery.Find(root, leaf);
+            if (hit is not null) return hit;
         }
         // Nichts da → primaeren Kandidaten als Default-Anzeige-Pfad
         return PrimaryCandidate(game);

@@ -3,7 +3,7 @@
     <!-- v1.18.0: IImageDecoder (zentraler Bild-Decoder) — Workshop-Cover
          via _host.Images.DecodeAsync. v1.17.0: IWorkshopService — dieser
          Plugin ist ein reiner Workshop-Consumer, kein Nexus/kein Download. -->
-    <PackageVersion Include="KroModIx.Plugin.Contracts" Version="1.27.0" />
+    <PackageVersion Include="KroModIx.Plugin.Contracts" Version="1.29.0" />
     <PackageVersion Include="Avalonia" Version="12.1.0" />
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageVersion Include="MinVer" Version="7.0.0" />
