@@ -1,5 +1,6 @@
 using System.IO;
 using NLog;
+using KroModIx.Plugin.Contracts;
 
 namespace KroModIx.Plugin.CaptainOfIndustry.Services;
 
@@ -10,8 +11,20 @@ public sealed class CoiInstallService
 {
     private static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
+    /// <summary>Wirft, wenn der Eintrag einem fremden Mod-Manager gehört. Die
+    /// Meldung nennt Verwalter, Folge und Ausweg — am 04.10.2026 hat genau so
+    /// ein Löschen im Icarus-Plugin eine Mod aus dem Spiel genommen, ohne dass
+    /// es auffiel, weil die Quelle woanders unversehrt lag.</summary>
+    private static void NurWennUnser(CoiMod mod, string verb)
+    {
+        if (mod.CanModify) return;
+        throw new InvalidOperationException(
+            ForeignManagerDetection.Meldung(mod.DisplayName, mod.ManagedBy, verb));
+    }
+
     public string SetEnabled(CoiMod mod, bool enable)
     {
+        NurWennUnser(mod, "umschalten");
         var path = mod.Path;
         var parent = Path.GetDirectoryName(path)!;
         var name = new DirectoryInfo(path).Name;
@@ -35,6 +48,7 @@ public sealed class CoiInstallService
 
     public void Uninstall(CoiMod mod)
     {
+        NurWennUnser(mod, "deinstallieren");
         if (Directory.Exists(mod.Path)) Directory.Delete(mod.Path, recursive: true);
         Log.Info("Uninstall: {Path}", mod.Path);
     }

@@ -58,7 +58,9 @@ public sealed class CoiModScanner
             }
             catch { }
         }
-        return mods.OrderBy(m => m.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
+        // Fremdverwaltete Eintraege einmal beim Scan markieren.
+        return mods.Select(m => m.MitVerwalterErkennung())
+            .OrderBy(m => m.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     /// <summary>Parst mod.json. Toleriert die ueblichen Feld-Varianten
