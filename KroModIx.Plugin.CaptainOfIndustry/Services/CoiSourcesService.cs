@@ -26,9 +26,9 @@ public sealed class CoiSourcesService
     /// — der Zweigname steht hinter <c>raw/branch/</c>, nicht direkt hinter
     /// <c>raw/</c>. Ohne das <c>branch/</c> antwortet die Forge mit 404.</para></summary>
     private const string RawUrl =
-        "https://git.flexfamily.cloud/KroModIx/KroModIx.CoiModIndex/raw/branch/main/sources.json";
+        "https://git.flexfamily.de/KroModIx/KroModIx.CoiModIndex/raw/branch/main/sources.json";
     private const string ContributionUrl =
-        "https://git.flexfamily.cloud/KroModIx/KroModIx.CoiModIndex";
+        "https://git.flexfamily.de/KroModIx/KroModIx.CoiModIndex";
     private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(6);
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
