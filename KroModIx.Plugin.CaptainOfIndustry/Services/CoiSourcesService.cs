@@ -19,10 +19,16 @@ namespace KroModIx.Plugin.CaptainOfIndustry.Services;
 /// State des Workshop-Tabs.</para></summary>
 public sealed class CoiSourcesService
 {
+    /// <summary>Die Quellenliste liegt seit dem 28.10.2026 in der eigenen Forge.
+    ///
+    /// <para>Forgejos Entsprechung zu raw.githubusercontent.com ist
+    /// <c>&lt;forge&gt;/&lt;owner&gt;/&lt;repo&gt;/raw/branch/&lt;zweig&gt;/&lt;datei&gt;</c>
+    /// — der Zweigname steht hinter <c>raw/branch/</c>, nicht direkt hinter
+    /// <c>raw/</c>. Ohne das <c>branch/</c> antwortet die Forge mit 404.</para></summary>
     private const string RawUrl =
-        "https://raw.githubusercontent.com/KroModIx/KroModIx.CoiModIndex/main/sources.json";
+        "https://git.flexfamily.cloud/KroModIx/KroModIx.CoiModIndex/raw/branch/main/sources.json";
     private const string ContributionUrl =
-        "https://github.com/KroModIx/KroModIx.CoiModIndex";
+        "https://git.flexfamily.cloud/KroModIx/KroModIx.CoiModIndex";
     private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(6);
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
